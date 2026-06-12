@@ -203,11 +203,15 @@ impl GpuMiner {
                 }
             };
 
-            let pipeline = match device.new_compute_pipeline_state(&function) {
-                Ok(p) => p,
-                Err(e) => {
-                    eprintln!("[ERROR] Failed to create compute pipeline: {}", e);
-                    return None;
+            let pipeline = {
+                let desc = ComputePipelineDescriptor::new();
+                desc.set_compute_function(Some(&function));
+                match device.new_compute_pipeline_state(&desc) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("[ERROR] Failed to create compute pipeline: {}", e);
+                        return None;
+                    }
                 }
             };
 
@@ -526,7 +530,7 @@ fn run_gpu_search(
             *(flag_buf[slot].contents() as *mut u32) = 0;
         }
 
-        let cb = command_queue.new_command_buffer();
+        let cb = command_queue.new_command_buffer().to_owned();
         let encoder = cb.new_compute_command_encoder();
 
         encoder.set_compute_pipeline_state(pipeline);
