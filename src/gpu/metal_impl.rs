@@ -425,13 +425,18 @@ impl GpuMiner {
                                 let header = job.build_header(&merkle_root, ntime, nonce);
                                 let hash = crate::job::double_sha256(&header);
                                 let meets = hash_meets_target(&hash, &target);
-                                eprintln!(
-                                    "{} [DEBUG] GPU found nonce={:08x}, hash={}, meets_target={}",
-                                    ts(),
-                                    nonce,
-                                    hex::encode(hash),
-                                    meets
-                                );
+                                {
+                                    use std::io::Write;
+                                    let msg = format!(
+                                        "{} [DEBUG] GPU found nonce={:08x}, hash={}, meets={}\n",
+                                        ts(),
+                                        nonce,
+                                        hex::encode(hash),
+                                        meets
+                                    );
+                                    let _ = std::io::stderr().write_all(msg.as_bytes());
+                                    let _ = std::io::stderr().flush();
+                                }
                                 if meets {
                                     eprintln!(
                                         "{} \x1b[33mGPU FOUND SHARE!\x1b[0m nonce={:08x}, hash={}",
