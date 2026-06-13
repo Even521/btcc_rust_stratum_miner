@@ -157,3 +157,77 @@ pub fn diff_to_target(diff: f64) -> [u8; 32] {
     result[5] = bytes[15];
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that prev_hash is per-4-byte-word reversed, matching Python's
+    /// stratum_prevhash_to_le32.
+    #[test]
+    fn test_prev_hash_per_word_reverse() {
+        let job = MiningJob {
+            job_id: "test".into(),
+            // Each 8-char group is one 4-byte word in big-endian hex.
+            // Word 0: 0x11223344, Word 1: 0x55667788, ... Word 7: 0xFFEEDDCC
+            prev_hash: "112233445566778899aabbccddeeff00"
+                       "00112233445566778899aabbccddeeff".into(),
+            coinb1: "".into(),
+            coinb2: "".into(),
+            merkle_branch: vec![],
+            version: "20000000".into(),
+            nbits: "1d00ffff".into(),
+            ntime: "00000000".into(),
+            clean_jobs: None,
+        };
+
+        let merkle_root = [0u8; 32];
+        let header = job.build_header(&merkle_root, 0, 0);
+
+        // After per-4-byte-word reversal:
+        // Word 0: 0x11223344 -> bytes [0x44, 0x33, 0x22, 0x11]
+        assert_eq!(header[4], 0x44);
+        assert_eq!(header[5], 0x33);
+        assert_eq!(header[6], 0x22);
+        assert_eq!(header[7], 0x11);
+
+        // Word 1: 0x55667788 -> bytes [0x88, 0x77, 0x66, 0x55]
+        assert_eq!(header[8], 0x88);
+        assert_eq!(header[9], 0x77);
+        assert_eq!(header[10], 0x66);
+        assert_eq!(header[11], 0x55);
+
+        // Word 7: 0xFFEEDDCC -> bytes [0xCC, 0xDD, 0xEE, 0xFF]
+        assert_eq!(header[32], 0xCC);
+        assert_eq!(header[33], 0xDD);
+        assert_eq!(header[34], 0xEE);
+        assert_eq!(header[35], 0xFF);
+    }
+
+    /// Verify merkle_root is copied directly (no reversal).
+    #[test]
+    fn test_merkle_root_direct_copy() {
+        let job = MiningJob {
+            job_id: "test".into(),
+            prev_hash: "00000000000000000000000000000000"
+                       "00000000000000000000000000000000".into(),
+            coinb1: "".into(),
+            coinb2: "".into(),
+            merkle_branch: vec![],
+            version: "20000000".into(),
+            nbits: "1d00ffff".into(),
+            ntime: "00000000".into(),
+            clean_jobs: None,
+        };
+
+        let mut merkle_root = [0u8; 32];
+        merkle_root[0] = 0xAA;
+        merkle_root[31] = 0xBB;
+
+        let header = job.build_header(&merkle_root, 0, 0);
+
+        // Direct copy: header[36] == merkle_root[0], header[67] == merkle_root[31]
+        assert_eq!(header[36], 0xAA);
+        assert_eq!(header[67], 0xBB);
+    }
+}
