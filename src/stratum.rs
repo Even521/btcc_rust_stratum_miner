@@ -189,17 +189,10 @@ fn handle_connection(
             let run = running_for_workers.clone();
             let hr = hashrate_for_workers.clone();
             let sub = sub_for_workers.clone();
+            let diff = diff_for_workers.clone();
             let tx = share_tx.clone();
             thread::spawn(move || {
-                cpu_mining_worker(
-                    job,
-                    run,
-                    hr,
-                    sub,
-                    diff_for_workers.clone(),
-                    worker_idx as u32,
-                    tx,
-                );
+                cpu_mining_worker(job, run, hr, sub, diff, worker_idx as u32, tx);
             });
         }
     }
