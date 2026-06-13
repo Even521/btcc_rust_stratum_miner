@@ -141,20 +141,11 @@ pub fn diff_to_target(diff: f64) -> [u8; 32] {
     // The top 16 bits of val go to bytes 4-5, the lower bits fill bytes 6+
 
     let mut result = [0u8; 32];
-    let bytes = val.to_be_bytes(); // 16 bytes (u128), value right-aligned
-                                   // val represents the mantissa; target = val * 2^208
-                                   // So val's bytes go to result[4..], with val's MSB at result[4]
-                                   // Find how many bytes val actually occupies (skip leading zeros, but keep at least 1)
-    let mut first_nonzero = 0;
-    while first_nonzero < 15 && bytes[first_nonzero] == 0 {
-        first_nonzero += 1;
-    }
-    // Copy from first_nonzero to end, placing at result[4..]
-    for j in 0..(16 - first_nonzero) {
-        let d = 4 + j;
-        if d < 32 {
-            result[d] = bytes[first_nonzero + j];
-        }
-    }
+    // val = 0xFFFF / diff, so val is in range [0, 0xFFFF]
+    // 0xFFFF occupies 2 bytes. val always occupies 2 bytes in the target.
+    // Place the last 2 bytes of val.to_be_bytes() at result[4..5]
+    let bytes = val.to_be_bytes();
+    result[4] = bytes[14];
+    result[5] = bytes[15];
     result
 }
