@@ -7,7 +7,7 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::gpu::GpuMiner;
-use crate::job::{hash_meets_target, nbits_to_target, MiningJob};
+use crate::job::{hash_meets_target, MiningJob};
 
 /// Format a timestamp for log output: [HH:MM:SS]
 fn ts() -> String {
@@ -44,9 +44,11 @@ pub struct StratumClient {
     running: Arc<AtomicBool>,
     gpu_miner: Option<GpuMiner>,
     /// Shared mining job state.
-    pub current_job: Arc<Mutex<Option<(MiningJob, [u8; 32])>>>, // (job, target)
+    pub current_job: Arc<Mutex<Option<MiningJob>>>,
     pub subscription: Arc<Mutex<Option<Subscription>>>,
     pub hashrate: Arc<Mutex<f64>>,
+    /// Current share difficulty (from mining.set_difficulty).
+    pub difficulty: Arc<Mutex<f64>>,
 }
 
 impl StratumClient {
@@ -60,6 +62,7 @@ impl StratumClient {
             current_job: Arc::new(Mutex::new(None)),
             subscription: Arc::new(Mutex::new(None)),
             hashrate: Arc::new(Mutex::new(0.0)),
+            difficulty: Arc::new(Mutex::new(1.0)),
         }
     }
 
@@ -69,6 +72,7 @@ impl StratumClient {
         let current_job = self.current_job.clone();
         let subscription = self.subscription.clone();
         let hashrate = self.hashrate.clone();
+        let difficulty = self.difficulty.clone();
         let server = self.server.clone();
         let username = self.username.clone();
         let password = self.password.clone();
@@ -93,6 +97,7 @@ impl StratumClient {
                         &current_job,
                         &subscription,
                         &hashrate,
+                        &difficulty,
                         &gpu_miner,
                         &gpu_started,
                     ) {
@@ -121,9 +126,10 @@ fn handle_connection(
     username: &str,
     password: &str,
     running: &Arc<AtomicBool>,
-    current_job: &Arc<Mutex<Option<(MiningJob, [u8; 32])>>>,
+    current_job: &Arc<Mutex<Option<MiningJob>>>,
     subscription: &Arc<Mutex<Option<Subscription>>>,
     hashrate: &Arc<Mutex<f64>>,
+    difficulty: &Arc<Mutex<f64>>,
     gpu_miner: &Option<GpuMiner>,
     gpu_started: &Arc<AtomicBool>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -152,6 +158,7 @@ fn handle_connection(
     let running_for_workers = running.clone();
     let hashrate_for_workers = hashrate.clone();
     let sub_for_workers = subscription.clone();
+    let diff_for_workers = difficulty.clone();
 
     // Start GPU miner if available, otherwise fall back to CPU
     // Only start once — reconnects reuse the existing GPU thread.
@@ -164,6 +171,7 @@ fn handle_connection(
                 hashrate_for_workers.clone(),
                 share_tx.clone(),
                 sub_for_workers.clone(),
+                diff_for_workers.clone(),
             );
         } else {
             eprintln!(
@@ -183,7 +191,15 @@ fn handle_connection(
             let sub = sub_for_workers.clone();
             let tx = share_tx.clone();
             thread::spawn(move || {
-                cpu_mining_worker(job, run, hr, sub, worker_idx as u32, tx);
+                cpu_mining_worker(
+                    job,
+                    run,
+                    hr,
+                    sub,
+                    diff_for_workers.clone(),
+                    worker_idx as u32,
+                    tx,
+                );
             });
         }
     }
@@ -261,10 +277,6 @@ fn handle_connection(
                                             clean_jobs: params[8].as_bool(),
                                         };
 
-                                        let nbits_u32 = u32::from_str_radix(&job.nbits, 16)
-                                            .unwrap_or(0x1d00ffff);
-                                        let target = nbits_to_target(nbits_u32);
-
                                         eprintln!(
                                             "{} New job: id={}, prev_hash={}, nbits={}",
                                             ts(),
@@ -273,13 +285,14 @@ fn handle_connection(
                                             job.nbits
                                         );
 
-                                        *current_job.lock().unwrap() = Some((job, target));
+                                        *current_job.lock().unwrap() = Some(job);
                                     }
                                 }
                             }
                             "mining.set_difficulty" => {
                                 if let Some(params) = msg["params"].as_array() {
                                     if let Some(diff) = params[0].as_f64() {
+                                        *difficulty.lock().unwrap() = diff;
                                         eprintln!(
                                             "{} \x1b[33mDifficulty set to: {}\x1b[0m",
                                             ts(),
@@ -362,14 +375,15 @@ fn handle_connection(
 }
 
 fn cpu_mining_worker(
-    current_job: Arc<Mutex<Option<(MiningJob, [u8; 32])>>>,
+    current_job: Arc<Mutex<Option<MiningJob>>>,
     running: Arc<AtomicBool>,
     hashrate: Arc<Mutex<f64>>,
     subscription: Arc<Mutex<Option<Subscription>>>,
+    difficulty: Arc<Mutex<f64>>,
     worker_idx: u32,
     share_tx: mpsc::Sender<FoundShare>,
 ) {
-    use crate::job::double_sha256;
+    use crate::job::{diff_to_target, double_sha256};
     use std::time::Instant;
 
     let mut nonce: u32 = 0;
@@ -390,7 +404,9 @@ fn cpu_mining_worker(
             guard.clone()
         };
 
-        if let Some((job, target)) = job_data {
+        if let Some(job) = job_data {
+            let diff = *difficulty.lock().unwrap();
+            let target = diff_to_target(diff);
             let sub = subscription.lock().unwrap().clone();
             let extranonce1 = sub
                 .as_ref()

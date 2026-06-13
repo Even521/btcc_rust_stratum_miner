@@ -111,3 +111,41 @@ pub fn nbits_to_target(nbits: u32) -> [u8; 32] {
     }
     target
 }
+
+/// Bitcoin diff-1 target (big-endian).
+const DIFF1_TARGET: [u8; 32] = [
+    0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+/// Convert pool share difficulty to a 32-byte big-endian target.
+/// target = DIFF1_TARGET / difficulty
+pub fn diff_to_target(diff: f64) -> [u8; 32] {
+    if diff <= 0.0 {
+        return [0xFF; 32];
+    }
+    // DIFF1_TARGET as u256: 0x00000000FFFF0000000000000000000000000000000000000000000000000000
+    // We compute: result = DIFF1 / diff using 256-bit integer division
+    let mut result = [0u8; 32];
+    let mut remainder: u64 = 0;
+
+    // DIFF1 bytes: first 4 are 0x00, next 2 are 0xFF 0xFF, rest are 0x00
+    let diff1_bytes: [u8; 32] = [
+        0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00,
+    ];
+
+    // Scale diff to integer: multiply by 2^32 for fractional precision
+    let diff_scaled = (diff * (1u64 << 32) as f64) as u64;
+    if diff_scaled == 0 {
+        return [0xFF; 32];
+    }
+
+    for i in 0..32 {
+        let val = (remainder << 8) | (diff1_bytes[i] as u64);
+        result[i] = ((val << 32) / diff_scaled) as u8;
+        remainder = ((val << 32) % diff_scaled) >> 32;
+    }
+    result
+}

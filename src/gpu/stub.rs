@@ -19,11 +19,12 @@ impl GpuMiner {
     #[allow(unused)]
     pub fn run(
         &self,
-        _current_job: Arc<Mutex<Option<(MiningJob, [u8; 32])>>>,
+        _current_job: Arc<Mutex<Option<MiningJob>>>,
         _running: Arc<AtomicBool>,
         _hashrate: Arc<Mutex<f64>>,
         _share_tx: mpsc::Sender<FoundShare>,
         _subscription: Arc<Mutex<Option<Subscription>>>,
+        _difficulty: Arc<Mutex<f64>>,
     ) {
         // Stub: never called since new() returns None
     }

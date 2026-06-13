@@ -12,7 +12,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use crate::job::{hash_meets_target, MiningJob};
+use crate::job::{diff_to_target, hash_meets_target, MiningJob};
 use crate::stratum::FoundShare;
 
 fn ts() -> String {
@@ -267,11 +267,12 @@ impl GpuMiner {
     /// Run the GPU mining loop.
     pub fn run(
         &self,
-        current_job: Arc<Mutex<Option<(MiningJob, [u8; 32])>>>,
+        current_job: Arc<Mutex<Option<MiningJob>>>,
         running: Arc<AtomicBool>,
         hashrate: Arc<Mutex<f64>>,
         share_tx: mpsc::Sender<FoundShare>,
         subscription: Arc<Mutex<Option<crate::stratum::Subscription>>>,
+        difficulty: Arc<Mutex<f64>>,
     ) {
         let device = self.device.clone();
         let command_queue = self.command_queue.clone();
@@ -315,7 +316,10 @@ impl GpuMiner {
                     guard.clone()
                 };
 
-                if let Some((job, target)) = job_data {
+                if let Some(job) = job_data {
+                    // Compute share target from current difficulty
+                    let diff = *difficulty.lock().unwrap();
+                    let target = diff_to_target(diff);
                     // Get extranonce1 from subscription
                     let extranonce1 = {
                         let sub = subscription.lock().unwrap();
