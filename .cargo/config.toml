@@ -1,0 +1,6 @@
+# Apple Silicon (M1/M2/M3/M4) specific optimizations
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "target-cpu=apple-m2"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "target-cpu=native"]

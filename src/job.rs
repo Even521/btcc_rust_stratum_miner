@@ -90,34 +90,20 @@ pub fn double_sha256(data: &[u8]) -> [u8; 32] {
 }
 
 /// Check if a hash meets the target difficulty.
-/// Both hash and target are compared as big-endian 256-bit integers.
+/// `hash` is the raw SHA-256d output (natural byte order).
+/// `target` is a 32-byte big-endian 256-bit integer.
+/// Bitcoin compares the *display hash* (byte-reversed SHA-256d output)
+/// against the target, matching the Python reference: `sha256d(header)[::-1]`.
 pub fn hash_meets_target(hash: &[u8; 32], target: &[u8; 32]) -> bool {
+    // Compare display hash (byte-reversed) with target, MSB first.
     for i in 0..32 {
-        match hash[i].cmp(&target[i]) {
+        match hash[31 - i].cmp(&target[i]) {
             std::cmp::Ordering::Less => return true,
             std::cmp::Ordering::Greater => return false,
             std::cmp::Ordering::Equal => continue,
         }
     }
     true // equal also counts
-}
-
-/// Convert nbits (compact target) to a 32-byte big-endian target.
-pub fn nbits_to_target(nbits: u32) -> [u8; 32] {
-    let exponent = (nbits >> 24) as usize;
-    let mantissa = nbits & 0x00ff_ffff;
-
-    let mut target = [0u8; 32];
-    if exponent <= 3 {
-        // Very small target
-        let shift = 8 * (3 - exponent);
-        let val = mantissa >> shift;
-        target[29..32].copy_from_slice(&val.to_be_bytes());
-    } else {
-        let start = 32 - exponent;
-        target[start..start + 3].copy_from_slice(&mantissa.to_be_bytes()[1..4]);
-    }
-    target
 }
 
 /// Convert pool share difficulty to a 32-byte big-endian target.
@@ -227,5 +213,29 @@ mod tests {
         // Direct copy: header[36] == merkle_root[0], header[67] == merkle_root[31]
         assert_eq!(header[36], 0xAA);
         assert_eq!(header[67], 0xBB);
+    }
+
+    /// Verify hash_meets_target uses display hash (byte-reversed SHA-256d).
+    #[test]
+    fn test_hash_meets_target_uses_display_hash() {
+        // For diff=16, target = 0x000000000FFF00...
+        let target = diff_to_target(16.0);
+
+        // Raw SHA-256d output where the *natural* first byte is small,
+        // but the *display* hash (reversed) first byte is large.
+        // Natural output: [0x00, 0x00, 0x00, 0x00, 0x0F, 0xFF, 0x00, ...]
+        // Display hash:    [..., 0x00, 0xFF, 0x0F, 0x00, 0x00, 0x00, 0x00]
+        // The display hash's MSB is 0x00 which IS <= target's MSB (0x00).
+        let mut hash = [0u8; 32];
+        hash[0] = 0x00;
+        hash[4] = 0x0F;
+        hash[5] = 0xFF;
+        // Display hash MSB = hash[31] = 0x00 <= target[0] = 0x00 → meets!
+        assert!(hash_meets_target(&hash, &target));
+
+        // Now make display hash MSB > target MSB.
+        hash[31] = 0x01;
+        // Display hash MSB = 0x01 > target[0] = 0x00 → fails!
+        assert!(!hash_meets_target(&hash, &target));
     }
 }

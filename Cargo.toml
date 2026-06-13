@@ -20,10 +20,3 @@ metal-gpu = ["metal", "objc"]
 opt-level = 3
 lto = true
 codegen-units = 1
-
-# Apple M2 (ARM64) specific optimizations
-[target.aarch64-apple-darwin]
-rustflags = ["-C", "target-cpu=apple-m2"]
-
-[target.x86_64-apple-darwin]
-rustflags = ["-C", "target-cpu=native"]
