@@ -320,6 +320,12 @@ impl GpuMiner {
                     // Compute share target from current difficulty
                     let diff = *difficulty.lock().unwrap();
                     let target = diff_to_target(diff);
+                    eprintln!(
+                        "{} [DEBUG] diff={}, target={}",
+                        ts(),
+                        diff,
+                        hex::encode(target)
+                    );
                     // Get extranonce1 from subscription
                     let extranonce1 = {
                         let sub = subscription.lock().unwrap();
@@ -412,7 +418,15 @@ impl GpuMiner {
                                 // Verify on CPU
                                 let header = job.build_header(&merkle_root, ntime, nonce);
                                 let hash = crate::job::double_sha256(&header);
-                                if hash_meets_target(&hash, &target) {
+                                let meets = hash_meets_target(&hash, &target);
+                                eprintln!(
+                                    "{} [DEBUG] GPU found nonce={:08x}, hash={}, meets_target={}",
+                                    ts(),
+                                    nonce,
+                                    hex::encode(hash),
+                                    meets
+                                );
+                                if meets {
                                     eprintln!(
                                         "{} \x1b[33mGPU FOUND SHARE!\x1b[0m nonce={:08x}, hash={}",
                                         ts(),
