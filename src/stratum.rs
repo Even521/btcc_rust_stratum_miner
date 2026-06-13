@@ -218,7 +218,7 @@ fn handle_connection(
                 ]
             });
             eprintln!(
-                "{} Submitting share: job={}, nonce={:08x}",
+                "{} \x1b[36m→ Submitting share: job={}, nonce={:08x}\x1b[0m",
                 ts(),
                 share.job_id,
                 share.nonce
@@ -328,7 +328,7 @@ fn handle_connection(
                                         let accepted = msg["result"].as_bool().unwrap_or(false);
                                         if accepted {
                                             eprintln!(
-                                                "{} \x1b[32mShare accepted by pool!\x1b[0m",
+                                                "{} \x1b[32m✔ Share accepted by pool! YES\x1b[0m",
                                                 ts()
                                             );
                                         } else {
@@ -425,7 +425,7 @@ fn cpu_mining_worker(
 
                 if hash_meets_target(&hash, &target) {
                     eprintln!(
-                        "CPU FOUND SHARE! worker={}, nonce={:08x}, hash={}",
+                        "\x1b[33m✔ CPU FOUND SHARE!\x1b[0m worker={}, nonce={:08x}, hash={}",
                         worker_idx,
                         nonce,
                         hex::encode(hash)
