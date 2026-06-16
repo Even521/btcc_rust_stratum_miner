@@ -199,7 +199,8 @@ CPU 向 GPU 传递三个 buffer：
 | `target_be` | 32 bytes (8 × u32) | 目标值的 BE u32 数组 |
 
 GPU kernel 中每个线程：
-```metal
+```c
+// Metal (MSL) / OpenCL C — 两者逻辑完全相同
 w[0] = tail_words[0];   // merkle_root[28..32] as BE u32
 w[1] = tail_words[1];   // ntime as BE u32
 w[2] = tail_words[2];   // nbits as BE u32

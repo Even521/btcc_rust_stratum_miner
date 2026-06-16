@@ -137,7 +137,7 @@ fn handle_connection(
     let sub_msg = serde_json::json!({
         "id": 1,
         "method": "mining.subscribe",
-        "params": ["btcc-rust-miner/0.2.0"]
+        "params": ["btcc-rust-miner/0.3.0"]
     });
     send_json(&mut stream, &sub_msg)?;
 

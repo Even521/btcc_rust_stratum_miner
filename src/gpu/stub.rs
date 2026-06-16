@@ -1,4 +1,4 @@
-// Stub GPU miner for non-macOS platforms.
+// Stub GPU miner for platforms without GPU support.
 // Always returns None from new().
 
 use std::sync::atomic::AtomicBool;
@@ -12,7 +12,9 @@ pub struct GpuMiner;
 
 impl GpuMiner {
     pub fn new() -> Option<Self> {
-        eprintln!("GPU mining is only available on macOS with --features metal-gpu");
+        eprintln!("No GPU support available. Running in CPU-only mode.");
+        eprintln!("  macOS:   use --features metal-gpu");
+        eprintln!("  Windows/Linux: install OpenCL runtime and rebuild");
         None
     }
 

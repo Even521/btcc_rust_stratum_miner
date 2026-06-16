@@ -26,7 +26,7 @@ Stratum 使用长连接 TCP，所有通信都是换行符分隔的 JSON 消息�
 
 ```json
 // 矿工 → 矿池
-{"id": 1, "method": "mining.subscribe", "params": ["btcc-rust-miner/0.2.0"]}
+{"id": 1, "method": "mining.subscribe", "params": ["btcc-rust-miner/0.3.0"]}
 
 // 矿池 → 矿工
 {

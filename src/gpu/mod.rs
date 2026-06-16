@@ -1,19 +1,33 @@
-// GPU mining module - Metal (Apple Silicon / macOS only)
+// GPU mining module.
 //
-// On macOS with `--features metal-gpu`, this module provides GPU-accelerated
-// SHA-256d mining via Metal compute shaders.
-//
-// On other platforms, a stub GpuMiner is provided that always returns None.
+// Platform support:
+//   macOS + --features metal-gpu  → Metal (Apple Silicon)
+//   Windows/Linux                 → OpenCL (NVIDIA/AMD/Intel, default feature)
+//   Other / no GPU                → CPU fallback
 
 #[cfg(all(target_os = "macos", feature = "metal-gpu"))]
 mod metal_impl;
-
 #[cfg(all(target_os = "macos", feature = "metal-gpu"))]
 pub use metal_impl::GpuMiner;
 
-#[cfg(not(all(target_os = "macos", feature = "metal-gpu")))]
+#[cfg(all(
+    not(all(target_os = "macos", feature = "metal-gpu")),
+    feature = "opencl-gpu"
+))]
+mod opencl_impl;
+#[cfg(all(
+    not(all(target_os = "macos", feature = "metal-gpu")),
+    feature = "opencl-gpu"
+))]
+pub use opencl_impl::GpuMiner;
+
+#[cfg(not(any(
+    all(target_os = "macos", feature = "metal-gpu"),
+    feature = "opencl-gpu"
+)))]
 mod stub;
-
-#[cfg(not(all(target_os = "macos", feature = "metal-gpu")))]
+#[cfg(not(any(
+    all(target_os = "macos", feature = "metal-gpu"),
+    feature = "opencl-gpu"
+)))]
 pub use stub::GpuMiner;
-
